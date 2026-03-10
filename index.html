@@ -1484,6 +1484,73 @@ function App() {
     }, 80);
   };
 
+  const exportarExcel = () => {
+    // Load SheetJS dinamically if not loaded
+    const doExport = () => {
+      const XLSX = window.XLSX;
+      const fecha = new Date().toLocaleDateString("es-CO");
+      const nombreArchivo = `Costeo_OP${op||"000"}_Tipo${tipo}_${cat}.xlsx`;
+
+      // ── Hoja 1: Receta completa ──
+      const encabezado = [
+        ["SAFETY PRO — COSTEO DE OVEROLES"],
+        [],
+        ["OP N°:", op||"—", "", "Tipo:", tipo||"—", "", "Protección:", cat||"—"],
+        ["Total prendas:", total, "", "Costo/overol:", costoUnit, "", "Costo total OP:", costoTotal],
+        ["Fecha:", fecha],
+        [],
+        ["INSUMO", "REFERENCIA", "U.M.", "PRECIO UNIT", "CONSUMO/PRENDA", "COSTO/OVEROL", "TOTAL LOTE"],
+      ];
+
+      const filas = resultados.map(({slot, calc}) => [
+        slot.label,
+        calc.nombre,
+        calc.um,
+        calc.precio,
+        calc.consumoUnit,
+        calc.costoUnit,
+        calc.costoTotal,
+      ]);
+
+      const totalFila = ["", "TOTAL", "", "", "", costoUnit, costoTotal];
+
+      const data = [...encabezado, ...filas, [], totalFila];
+
+      // ── Hoja 2: Distribución tallas ──
+      const tallasHeader = [["DISTRIBUCIÓN POR TALLAS"], [], ["Talla", "Cantidad"]];
+      const tallasFilas  = TALLAS.map(t => [t, Number(cants[t])||0]).filter(r => r[1] > 0);
+      const tallasData   = [...tallasHeader, ...tallasFilas, [], ["TOTAL", total]];
+
+      const wb = XLSX.utils.book_new();
+
+      // Receta sheet
+      const ws1 = XLSX.utils.aoa_to_sheet(data);
+      ws1["!cols"] = [
+        {wch:22},{wch:40},{wch:8},{wch:16},{wch:16},{wch:16},{wch:18}
+      ];
+      // Merge title cell
+      ws1["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:6} }];
+      XLSX.utils.book_append_sheet(wb, ws1, "Receta");
+
+      // Tallas sheet
+      const ws2 = XLSX.utils.aoa_to_sheet(tallasData);
+      ws2["!cols"] = [{wch:10},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, ws2, "Tallas");
+
+      XLSX.writeFile(wb, nombreArchivo);
+    };
+
+    if (window.XLSX) {
+      doExport();
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      script.onload = doExport;
+      document.head.appendChild(script);
+    }
+  };
+
+
   // ── RENDER ──────────────────────────────────────────────────────────────
   return (
     React.createElement('div', { style: {
@@ -1665,6 +1732,14 @@ function App() {
               boxShadow:`0 0 16px ${T.yellow}33`,
               width:mob?"100%":"auto",
             },}, "💾 Guardar PDF"  )
+            , React.createElement('button', { onClick: exportarExcel, style: {
+              padding:"13px 20px", borderRadius:4, cursor:"pointer",
+              background:"#1D6F3A18", color:"#4ADE80", border:"1px solid #4ADE8066",
+              fontFamily:"'Space Mono',monospace", fontWeight:700, fontSize:11,
+              letterSpacing:2, textTransform:"uppercase",
+              boxShadow:"0 0 16px #4ADE8033",
+              width:mob?"100%":"auto",
+            },}, "📊 Excel" )
           ))
 
           , React.createElement('button', { onClick: ()=>{setOp("");setTipo("");setCat("");setCants({});setSels({});setSub(false);}, style: {
